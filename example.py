@@ -11,6 +11,7 @@ from ouroboros import Ouroboros
 turbo = dspy.OpenAI(model='gpt-3.5-turbo', max_tokens=400)
 dspy.settings.configure(lm=turbo)
 
+# Example adapted from the DSPy assertions paper
 
 def format_checker(choice_string):
     try:
@@ -27,6 +28,13 @@ def is_correct_answer_included(answer, choice_string):
 def is_plausibility_yes(assessment_answer):
     return "yes" in assessment_answer.lower()
 
+# QuizChoiceGenerationWithAssertions is implemented using the DSPy retrying
+# mechanisms. Internally what happens is that the program is run linearly (normally)
+# at each suggestion place, DSPy takes over and determines if the suggestion is hit
+# (like the condition is true). If it is, the code restarts at the forward function
+# and the feedback is silently incorporated by changing the signiature of choice_string
+# There is an internal limit to retries for a given module and once it exceeded that
+# it bascially gives up
 
 class QuizChoiceGenerationWithAssertions(dspy.Module):
     def __init__(self):
@@ -59,12 +67,18 @@ class QuizChoiceGenerationWithAssertions(dspy.Module):
 quiz_choice_with_assertion = assert_transform_module(QuizChoiceGenerationWithAssertions().map_named_predictors(Retry),
                                                      backtrack_handler)
 
-# print(quiz_choice_with_assertion(
-#     question="How long does a FAA first-class medical certificate last for a 41 years old?",
-#     answer="6 months"))
+print(quiz_choice_with_assertion(
+    question="How long does a FAA first-class medical certificate last for a 41 years old?",
+    answer="6 months"))
 
 effect_our = Ouroboros()
 
+# My implementation tries to replicate the behavior of the DSPy internal ad-hoc implementation
+# and see how someone could use effect handlers as a way to exert more control over the error handling process
+# in this example, we opt to have more flexibility by collecting the feedbacks then, determine if we really want to
+# retry. And if we decide to indeed retry we could up the LM setting to a much more powerful model.
+# There is a slight technical complication is that the control flow mechanism that i am powering the effect handlers
+# doesn't play well with the temporary setting mechanism that DSPy currently employs
 
 class QuizChoiceGenerationWithEffect(dspy.Module):
     def __init__(self):
@@ -130,7 +144,7 @@ print(QuizChoiceGenerationWithEffect()(
     answer="6 months"))
 
 
-# todo converts into a jupiter
+# todo converts into a jupiter (maybe ?)
 # todo integration with DSPy affects usabiliyty
 # todo how could things hook up to it generically
     # it seems in dspy this is done internally, but maybe the API could be made to "query" past effects
